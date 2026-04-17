@@ -744,6 +744,7 @@ function connect() {
       }
       renderChannelList();
       renderMessages();
+      renderParticipants();
     }
   };
 }
@@ -775,8 +776,13 @@ document.querySelectorAll('.tab').forEach(tab => {
     const viewId = tab.dataset.view;
     document.getElementById(viewId).classList.add('active');
     if (viewId === 'graph-view') initGraph();
+    if (viewId === 'chat-view') renderParticipants();
+    if (viewId === 'scrum-view') renderScrum();
   });
 });
+
+// Fallback: re-render participants every 3s in case of timing issues
+setInterval(() => { if (state && state.agents && state.agents.length > 0) renderParticipants(); }, 3000);
 
 // ════════════════════════════════════════════════════════════════
 // Top Bar

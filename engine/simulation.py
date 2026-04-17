@@ -86,6 +86,14 @@ class SimulationEngine:
     # ── State snapshot for frontend ──────────────────────────────────────────
 
     def snapshot(self) -> dict:
+        if self.world is None or self.team_data is None:
+            return {"type": "state", "platform": "Loading...", "sprint": 0,
+                    "sprint_state": "init", "sprint_day": 0, "initiative": "",
+                    "day": 0, "team_morale": 70, "process_overhead": 20,
+                    "stakeholder_satisfaction": 65, "global_tech_debt": 0,
+                    "velocity_trend": [], "completed_initiatives": 0,
+                    "tech_debt_events": 0, "agents": [], "services": {},
+                    "backlog": [], "events": [], "service_dependencies": []}
         world = self.world
         return {
             "type": "state",
