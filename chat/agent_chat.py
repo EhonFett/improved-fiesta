@@ -225,6 +225,73 @@ _RANDOM_MESSAGES = [
     "genuinely excited about this story. for about 2 hours. then i saw the legacy integration.",
 ]
 
+# ── Engineer sidebar messages (architect complaints + outsider jokes + personal chaos) ────
+
+_ARCHITECT_COMPLAINTS = [
+    "did anyone actually read the latest diagram? it has 4 services labeled 'TBD'",
+    "the architect scheduled a 2-hour sync to explain a decision they could've slacked in 3 sentences",
+    "love how the architecture doc says 'see diagram' and the diagram says 'see doc'",
+    "the architect approved this approach last week and now says we should do it differently. cool.",
+    "just got feedback that my implementation 'doesn't match the vision'. what vision. show me the vision.",
+    "the architecture presentation was 47 slides. the decision was on slide 46.",
+    "we've had 3 architecture reviews and still no decision on the database. incredible.",
+    "the architect uses the word 'elegant' to mean 'I haven't thought about the edge cases'",
+    "I asked the architect a yes/no question. 20 minutes later: still no answer, new diagram",
+    "gentle reminder that 'let's whiteboard it' is not a deliverable",
+    "the architecture doc is 'living'. it is so alive. it changes every time I look.",
+    "the architect redesigned the whole thing after I was 80% done. on a friday.",
+    "got feedback that my PR 'violates the design principles'. which ones. name them.",
+    "the architecture review meeting has been rescheduled 4 times. at this point I'm just building it",
+    "love a good RFC that asks more questions than it answers",
+    "the architect keeps referencing 'the agreed-upon pattern'. nobody agreed. I was there.",
+    "spent 3 days following the architecture doc. doc was for a different service.",
+    "the diagram uses hexagons. I don't know what the hexagons mean. nobody does.",
+    "asked the architect if we should cache this. answer: 'it depends'. thanks.",
+    "the architect is on vacation. the architecture is also on vacation apparently.",
+]
+
+_OUTSIDER_JOKES = [
+    "another all-hands from leadership. the word 'synergy' count: 7",
+    "the other team broke the shared library again. and didn't tell anyone.",
+    "the platform team says the fix is 'on the roadmap'. Q4 roadmap. Q4 2025.",
+    "the data team has a different definition of 'done' and I respect that (I don't)",
+    "shoutout to the other squad who pushed directly to main at 4pm on a friday. legends.",
+    "the security team sent a 'critical finding'. it's a missing http header. fine.",
+    "the infra team's response time is legendary. legendarily slow.",
+    "the other team's PR broke staging. they closed the PR and called it resolved.",
+    "just got a message from a team I've never heard of asking why we changed an API from 2019",
+    "the QA team found a bug we introduced in sprint 3. sprint 3 was last year.",
+    "the product team added 6 new items to the backlog during the sprint. love the energy.",
+    "the design team delivered finals. and then delivered different finals an hour later.",
+    "the devops team said the pipeline 'should be fine'. it is not fine.",
+    "got a meeting invite from legal. adding this to my list of things I don't have time for.",
+    "the mobile team is asking for a new API endpoint. by tomorrow. they have a meeting.",
+    "customer success forwarded us a complaint that is... technically about a feature. a feature I warned about.",
+    "the other squad uses a different git branching strategy and it has caused so much chaos",
+    "leadership announced a new initiative. it's basically what we proposed 6 months ago.",
+    "someone from a completely different team reviewed my PR. rejected it. has no context.",
+    "the finance team needs a report generated. manually. by an engineer. cool use of skills.",
+]
+
+_PERSONAL_WEIRD = [
+    "btw I got mugged last night. I'm fine but also my laptop was in the bag so I might be slightly late on the PR",
+    "completely unrelated to work but I've decided to get married. met her this morning outside the Walgreens. she doesn't have a phone but she seemed nice",
+    "update: jury duty. also the judge let me hold the gavel and I kind of sentenced the guy? anyway back on Monday",
+    "so I found out today that I've been spelling my own middle name wrong for 34 years",
+    "my landlord sold the building. to me. I accidentally bought an apartment building. still figuring out the tax stuff",
+    "quick heads up I might be 20 min late tomorrow, I accidentally adopted a horse",
+    "small life update: I'm legally a licensed falconer now. didn't plan for this. falcon is named Jenkins.",
+    "so the doctor said the x-ray shows I have an extra rib. 'interesting but not medically relevant' they said. I disagree.",
+    "update on the jury thing: I definitely sentenced him. judge said I was 'the most decisive juror she'd ever seen'",
+    "this is unrelated to the sprint but I've started a small business. it's going fine. please don't ask what it is.",
+    "my neighbor challenged me to a duel at 7am. I said yes before I understood what he meant. it was a chess duel. I won.",
+    "just a heads up I might have accidentally gotten ordained as a minister last night. the internet is wild",
+    "I ran into my old boss at the grocery store. we hugged for a weird amount of time. no further updates.",
+    "quick personal note: I've been living in the office for 3 days because my roommate changed the locks. it's going great.",
+    "update: the horse situation is resolved. the horse is someone else's problem now. we remain on good terms.",
+    "so my therapist quit to become a painter and gave me a painting as a final session gift. it's a portrait of me looking tired.",
+]
+
 # ── Architecture channel messages ─────────────────────────────────────────────
 
 _ARCHITECTURE_MESSAGES = [
@@ -445,6 +512,17 @@ def generate_random_message(agent_data: dict) -> str:
     return msg
 
 
+def generate_engineer_sidebar(agent_data: dict) -> tuple[str, str]:
+    """Returns (channel, message) for engineer-only commentary."""
+    roll = random.random()
+    if roll < 0.45:
+        return ("random", random.choice(_ARCHITECT_COMPLAINTS))
+    elif roll < 0.80:
+        return ("random", random.choice(_OUTSIDER_JOKES))
+    else:
+        return ("general", random.choice(_PERSONAL_WEIRD))
+
+
 def generate_general_message(agent_data: dict) -> str:
     return random.choice(_GENERAL_MESSAGES)
 
@@ -518,6 +596,9 @@ def agent_chat_tick(
         if random.random() < 0.05:
             text = generate_general_message(agent_data)
             messages_out.append({"channel": "general", "text": text})
+        if role == "Software Engineer" and random.random() < 0.12:
+            ch, text = generate_engineer_sidebar(agent_data)
+            messages_out.append({"channel": ch, "text": text})
 
     elif phase == "idle":
         if random.random() < 0.18:
@@ -526,6 +607,9 @@ def agent_chat_tick(
         if random.random() < 0.06:
             text = generate_general_message(agent_data)
             messages_out.append({"channel": "general", "text": text})
+        if role == "Software Engineer" and random.random() < 0.08:
+            ch, text = generate_engineer_sidebar(agent_data)
+            messages_out.append({"channel": ch, "text": text})
 
     # Reactions to recent messages in active channels
     for channel in ["dev", "random", "sprint-standup", "general"]:
