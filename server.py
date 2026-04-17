@@ -42,6 +42,21 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Scrum Simulator", lifespan=lifespan)
 
 
+async def _restart_simulation() -> None:
+    global _engine, _sim_task
+    if _sim_task and not _sim_task.done():
+        _engine.stop()
+        _sim_task.cancel()
+        try:
+            await _sim_task
+        except asyncio.CancelledError:
+            pass
+    _engine = SimulationEngine(tick_delay=_engine.tick_delay if _engine else 0.6)
+    _engine.set_broadcast(broadcast)
+    _sim_task = asyncio.create_task(_engine.run())
+    await broadcast({"type": "restarted"})
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:
     html_path = Path(__file__).parent / "ui" / "index.html"
@@ -64,8 +79,11 @@ async def ws_endpoint(websocket: WebSocket) -> None:
             if msg.get("type") == "set_speed":
                 if _engine:
                     _engine.tick_delay = max(0.05, float(msg.get("value", 0.6)))
+            elif msg.get("type") == "restart":
+                await _restart_simulation()
     except WebSocketDisconnect:
-        _connections.remove(websocket)
+        if websocket in _connections:
+            _connections.remove(websocket)
 
 
 @app.get("/api/state")

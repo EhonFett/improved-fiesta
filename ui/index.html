@@ -117,6 +117,23 @@
     accent-color: var(--accent2);
   }
 
+  #restart-btn {
+    background: transparent;
+    border: 1px solid #555;
+    color: var(--text-dim);
+    padding: 4px 11px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: var(--font);
+    transition: all 0.15s;
+    margin-left: 6px;
+  }
+  #restart-btn:hover {
+    border-color: var(--red);
+    color: var(--red);
+  }
+
   /* ── Tab bar ─────────────────────────────────────────────── */
   #tabbar {
     background: var(--bg2);
@@ -612,6 +629,22 @@
     <input type="range" id="speed-slider" min="1" max="10" value="5" title="Simulation speed">
     <span id="speed-label">5×</span>
   </div>
+  <button id="restart-btn" title="Restart simulation" onclick="confirmRestart()">↺ Restart</button>
+</div>
+
+<!-- Restart modal -->
+<div id="restart-modal" style="display:none;position:fixed;inset:0;background:#0009;z-index:1000;display:none;align-items:center;justify-content:center;">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:28px 32px;max-width:400px;width:90%;text-align:center;">
+    <div style="font-size:28px;margin-bottom:10px">↺</div>
+    <div style="font-size:16px;font-weight:700;color:var(--text-bright);margin-bottom:8px">Restart Simulation?</div>
+    <div style="font-size:13px;color:var(--text-dim);margin-bottom:22px;line-height:1.5">
+      This will wipe the current company, team, initiatives, and all chat history.<br>A brand new simulation will start from scratch.
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button onclick="doRestart()" style="background:var(--red);color:#fff;border:none;padding:8px 22px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Yes, restart</button>
+      <button onclick="closeRestartModal()" style="background:var(--border);color:var(--text);border:none;padding:8px 22px;border-radius:6px;cursor:pointer;font-size:13px;">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <!-- Tab bar -->
@@ -745,6 +778,16 @@ function connect() {
       renderChannelList();
       renderMessages();
       renderParticipants();
+    } else if (msg.type === 'restarted') {
+      // Clear all local state and reload fresh
+      CHANNELS_ORDER.forEach(c => { channelMessages[c] = []; unreadCounts[c] = 0; });
+      state = null;
+      graphInitialized = false;
+      if (cy) { cy.destroy(); cy = null; }
+      renderChannelList();
+      renderMessages();
+      document.getElementById('restart-btn').textContent = '↺ Restarting...';
+      setTimeout(() => { document.getElementById('restart-btn').textContent = '↺ Restart'; }, 3000);
     }
   };
 }
@@ -1267,6 +1310,34 @@ function renderServiceDetail() {
     </div>
   `;
 }
+
+// ════════════════════════════════════════════════════════════════
+// Restart
+// ════════════════════════════════════════════════════════════════
+function confirmRestart() {
+  const modal = document.getElementById('restart-modal');
+  modal.style.display = 'flex';
+}
+
+function closeRestartModal() {
+  document.getElementById('restart-modal').style.display = 'none';
+}
+
+function doRestart() {
+  closeRestartModal();
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'restart' }));
+  }
+}
+
+// Handle server-side restart confirmation
+const _origOnMessage = ws.onmessage;
+// Patch into the existing onmessage via the restarted event type (handled in connect())
+
+// Close modal on backdrop click
+document.getElementById('restart-modal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeRestartModal();
+});
 
 // ════════════════════════════════════════════════════════════════
 // Init
