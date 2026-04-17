@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scrum Simulator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --bg2: #16213e;
+    --bg3: #0f3460;
+    --teams-bg: #1b1b2f;
+    --teams-sidebar: #201f33;
+    --teams-hover: #2d2b4e;
+    --teams-active: #464775;
+    --accent: #6264a7;
+    --accent2: #8b8fe8;
+    --text: #d6d6d6;
+    --text-dim: #888;
+    --text-bright: #fff;
+    --green: #3dd68c;
+    --yellow: #f4c262;
+    --red: #e06c75;
+    --cyan: #56b6c2;
+    --purple: #c678dd;
+    --border: #333355;
+    --msg-bg: #25234a;
+    --msg-hover: #2d2b56;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --mono: 'Courier New', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Top bar ─────────────────────────────────────────────── */
+  #topbar {
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+    z-index: 100;
+  }
+
+  #topbar .logo {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent2);
+    letter-spacing: 0.5px;
+  }
+
+  #topbar .platform-name {
+    color: var(--text-bright);
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  #topbar .sprint-badge {
+    background: var(--accent);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  #topbar .phase-badge {
+    background: var(--bg2);
+    color: var(--yellow);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    border: 1px solid var(--yellow);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .metric-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .metric-pill .val {
+    color: var(--text-bright);
+    font-weight: 600;
+  }
+
+  #speed-control {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  #speed-control input[type=range] {
+    width: 80px;
+    accent-color: var(--accent2);
+  }
+
+  /* ── Tab bar ─────────────────────────────────────────────── */
+  #tabbar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    padding: 0 16px;
+    gap: 0;
+    flex-shrink: 0;
+  }
+
+  .tab {
+    padding: 8px 18px;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    color: var(--accent2);
+    border-bottom-color: var(--accent2);
+  }
+
+  /* ── Main layout ─────────────────────────────────────────── */
+  #main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .view { display: none; width: 100%; }
+  .view.active { display: flex; }
+
+  /* ── CHAT VIEW ───────────────────────────────────────────── */
+  #chat-view {
+    display: none;
+    width: 100%;
+  }
+  #chat-view.active { display: flex; }
+
+  #chat-sidebar {
+    width: 220px;
+    background: var(--teams-sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+
+  #chat-sidebar .sidebar-header {
+    padding: 12px 16px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+  }
+
+  .channel-item {
+    padding: 6px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 0;
+    color: var(--text-dim);
+    font-size: 12px;
+    transition: background 0.1s;
+  }
+  .channel-item:hover { background: var(--teams-hover); color: var(--text); }
+  .channel-item.active { background: var(--teams-active); color: #fff; font-weight: 600; }
+  .channel-item .unread {
+    margin-left: auto;
+    background: var(--red);
+    color: #fff;
+    border-radius: 10px;
+    font-size: 9px;
+    padding: 1px 5px;
+    font-weight: 700;
+  }
+
+  #chat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #chat-header {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--teams-bg);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  #chat-header .ch-name {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-bright);
+  }
+  #chat-header .ch-desc { font-size: 11px; color: var(--text-dim); }
+
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 0;
+    scroll-behavior: smooth;
+  }
+
+  .msg {
+    padding: 4px 16px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    transition: background 0.1s;
+    animation: fadeIn 0.3s ease;
+  }
+  .msg:hover { background: var(--msg-hover); }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .msg-body { flex: 1; min-width: 0; }
+  .msg-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+  .msg-author { font-weight: 700; font-size: 13px; color: var(--text-bright); }
+  .msg-role { font-size: 10px; color: var(--text-dim); }
+  .msg-time { font-size: 10px; color: var(--text-dim); }
+  .msg-text {
+    color: var(--text);
+    line-height: 1.5;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  .msg-text strong { color: var(--text-bright); }
+
+  .msg-reactions {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .reaction-pill {
+    background: var(--msg-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2px 7px;
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    transition: background 0.1s;
+  }
+  .reaction-pill:hover { background: var(--teams-active); }
+
+  .typing-indicator {
+    padding: 6px 16px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-style: italic;
+    height: 22px;
+  }
+
+  .msg-separator {
+    padding: 8px 16px;
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .msg-separator::before, .msg-separator::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* right panel — participant list */
+  #chat-right {
+    width: 200px;
+    background: var(--teams-sidebar);
+    border-left: 1px solid var(--border);
+    padding: 12px 0;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+
+  #chat-right .section-header {
+    padding: 4px 14px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  .participant {
+    padding: 5px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-online { background: var(--green); }
+  .status-away { background: var(--yellow); }
+  .status-dnd { background: var(--red); }
+  .status-offline { background: var(--text-dim); }
+
+  .participant-name { font-size: 12px; color: var(--text); }
+  .participant-role { font-size: 10px; color: var(--text-dim); }
+
+  /* ── SCRUM VIEW ──────────────────────────────────────────── */
+  #scrum-view {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #scrum-view.active { display: flex; }
+
+  #scrum-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .scrum-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg2);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .scrum-col-header {
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .col-count {
+    background: var(--border);
+    color: var(--text-dim);
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-size: 10px;
+  }
+
+  .scrum-cards {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .story-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    animation: fadeIn 0.3s ease;
+  }
+  .story-card:hover { border-color: var(--accent2); }
+
+  .story-card .card-id { font-size: 10px; color: var(--accent2); font-family: var(--mono); }
+  .story-card .card-title { font-size: 12px; color: var(--text-bright); margin: 3px 0; line-height: 1.3; }
+  .story-card .card-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .card-pts { background: var(--accent); color: #fff; border-radius: 3px; padding: 1px 5px; font-size: 10px; font-weight: 700; }
+  .card-assignee { font-size: 10px; color: var(--text-dim); }
+  .card-blocker { font-size: 10px; color: var(--red); margin-top: 3px; }
+  .confusion-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Team panel in scrum view */
+  #team-panel {
+    width: 220px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+  }
+
+  .team-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .team-card h3 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .agent-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .agent-row:last-child { border-bottom: none; }
+
+  .agent-info { flex: 1; min-width: 0; }
+  .agent-name { font-size: 12px; font-weight: 600; color: var(--text-bright); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agent-role-label { font-size: 10px; color: var(--text-dim); }
+
+  .morale-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 3px;
+    overflow: hidden;
+  }
+  .morale-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+
+  .org-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .org-metric:last-child { border-bottom: none; }
+  .org-metric .label { color: var(--text-dim); }
+  .org-metric .value { font-weight: 600; }
+
+  /* ── GRAPH VIEW ──────────────────────────────────────────── */
+  #graph-view {
+    display: none;
+    width: 100%;
+    position: relative;
+  }
+  #graph-view.active { display: flex; }
+
+  #cy {
+    flex: 1;
+    background: radial-gradient(ellipse at center, #0d1b2a 0%, #0a0a1a 100%);
+  }
+
+  #graph-sidebar {
+    width: 280px;
+    background: var(--bg2);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+
+  #graph-sidebar .gs-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-bright);
+  }
+
+  #service-detail { padding: 12px 16px; }
+  #service-detail .sd-name { font-size: 16px; font-weight: 700; color: var(--text-bright); margin-bottom: 8px; }
+  #service-detail .sd-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  #service-detail .sd-row:last-child { border-bottom: none; }
+  #service-detail .sd-label { color: var(--text-dim); }
+  #service-detail .sd-val { font-weight: 600; }
+
+  .health-bar-large {
+    width: 100%;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 4px 0;
+  }
+  .health-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+
+  .incident-log {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .incident-log .il-title { font-size: 11px; font-weight: 700; color: var(--red); margin-bottom: 4px; }
+
+  /* ── Scrollbars ──────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+  /* ── Misc ────────────────────────────────────────────────── */
+  .tag {
+    display: inline-block;
+    background: var(--msg-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  #connection-status {
+    position: fixed;
+    bottom: 10px;
+    right: 14px;
+    font-size: 10px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  #conn-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+  #conn-dot.disconnected { background: var(--red); }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <span class="logo">⚙ SCRUM SIMULATOR</span>
+  <span class="platform-name" id="tb-platform">Loading...</span>
+  <span class="sprint-badge" id="tb-sprint">Sprint 0</span>
+  <span class="phase-badge" id="tb-phase">init</span>
+  <span class="metric-pill">Morale <span class="val" id="tb-morale">—</span></span>
+  <span class="metric-pill">Tech Debt <span class="val" id="tb-debt">—</span></span>
+  <span class="metric-pill">Velocity <span class="val" id="tb-velocity">—</span></span>
+  <span class="metric-pill">Day <span class="val" id="tb-day">0</span></span>
+  <div id="speed-control">
+    Speed
+    <input type="range" id="speed-slider" min="1" max="10" value="5" title="Simulation speed">
+    <span id="speed-label">5×</span>
+  </div>
+</div>
+
+<!-- Tab bar -->
+<div id="tabbar">
+  <div class="tab active" data-view="chat-view">💬 Teams Chat</div>
+  <div class="tab" data-view="scrum-view">📋 Scrum Board</div>
+  <div class="tab" data-view="graph-view">🕸 Microservice Graph</div>
+</div>
+
+<!-- Main content -->
+<div id="main">
+
+  <!-- ══ CHAT VIEW ════════════════════════════════════════════ -->
+  <div id="chat-view" class="view active">
+    <div id="chat-sidebar">
+      <div class="sidebar-header">Channels</div>
+      <div id="channel-list"></div>
+    </div>
+
+    <div id="chat-main">
+      <div id="chat-header">
+        <span style="color:var(--text-dim);font-size:14px">#</span>
+        <span class="ch-name" id="ch-name">general</span>
+        <span class="ch-desc" id="ch-desc"></span>
+      </div>
+      <div id="messages"></div>
+      <div class="typing-indicator" id="typing-indicator"></div>
+    </div>
+
+    <div id="chat-right">
+      <div class="section-header">Online — <span id="online-count">0</span></div>
+      <div id="participant-list"></div>
+    </div>
+  </div>
+
+  <!-- ══ SCRUM VIEW ═══════════════════════════════════════════ -->
+  <div id="scrum-view" class="view">
+    <div id="scrum-content">
+      <!-- Kanban columns inserted by JS -->
+      <div id="kanban" style="flex:1;display:flex;gap:10px;overflow:hidden;"></div>
+      <div id="team-panel">
+        <div class="team-card">
+          <h3>Team</h3>
+          <div id="team-list"></div>
+        </div>
+        <div class="team-card">
+          <h3>Org Health</h3>
+          <div id="org-metrics"></div>
+        </div>
+        <div class="team-card">
+          <h3>Velocity</h3>
+          <canvas id="vel-chart" width="196" height="80"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ GRAPH VIEW ═══════════════════════════════════════════ -->
+  <div id="graph-view" class="view">
+    <div id="cy"></div>
+    <div id="graph-sidebar">
+      <div class="gs-header">🕸 Microservice Graph</div>
+      <div id="service-detail">
+        <div style="color:var(--text-dim);font-size:12px">Click a service node to inspect it.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="connection-status">
+  <div id="conn-dot"></div>
+  <span id="conn-label">Connecting...</span>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// State
+// ════════════════════════════════════════════════════════════════
+let state = null;
+let currentChannel = 'general';
+const channelMessages = {};
+const CHANNEL_DESCRIPTIONS = {
+  'general': 'Company-wide announcements and conversation',
+  'sprint-standup': 'Daily standups and sprint ceremonies',
+  'dev': 'Engineering discussions and PR updates',
+  'architecture': 'Architecture decisions and design',
+  'production-incidents': 'Incident response and outages',
+  'random': 'Off-topic, memes, vibes',
+};
+const CHANNELS_ORDER = ['general','sprint-standup','dev','architecture','production-incidents','random'];
+const unreadCounts = {};
+CHANNELS_ORDER.forEach(c => { channelMessages[c] = []; unreadCounts[c] = 0; });
+
+let cy = null; // cytoscape instance
+let selectedService = null;
+
+// ════════════════════════════════════════════════════════════════
+// WebSocket
+// ════════════════════════════════════════════════════════════════
+const connDot = document.getElementById('conn-dot');
+const connLabel = document.getElementById('conn-label');
+let ws;
+
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => {
+    connDot.classList.remove('disconnected');
+    connLabel.textContent = 'Live';
+    updateSpeedFromSlider();
+  };
+  ws.onclose = () => {
+    connDot.classList.add('disconnected');
+    connLabel.textContent = 'Reconnecting...';
+    setTimeout(connect, 2000);
+  };
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'state') {
+      state = msg;
+      renderTopbar();
+      renderScrum();
+      renderGraph();
+      renderParticipants();
+    } else if (msg.type === 'chat') {
+      handleChatMessage(msg.channel, msg.message);
+    } else if (msg.type === 'chat_history') {
+      for (const [ch, msgs] of Object.entries(msg.channels)) {
+        channelMessages[ch] = msgs;
+      }
+      renderChannelList();
+      renderMessages();
+    }
+  };
+}
+
+connect();
+
+// Speed control
+const speedSlider = document.getElementById('speed-slider');
+const speedLabel = document.getElementById('speed-label');
+function updateSpeedFromSlider() {
+  const val = parseInt(speedSlider.value);
+  speedLabel.textContent = val + '×';
+  // Map 1-10 slider to 2.0 - 0.1 seconds
+  const delay = 2.1 - (val * 0.2);
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'set_speed', value: delay }));
+  }
+}
+speedSlider.addEventListener('input', updateSpeedFromSlider);
+
+// ════════════════════════════════════════════════════════════════
+// Tabs
+// ════════════════════════════════════════════════════════════════
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    tab.classList.add('active');
+    const viewId = tab.dataset.view;
+    document.getElementById(viewId).classList.add('active');
+    if (viewId === 'graph-view') initGraph();
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// Top Bar
+// ════════════════════════════════════════════════════════════════
+function renderTopbar() {
+  if (!state) return;
+  document.getElementById('tb-platform').textContent = state.platform;
+  document.getElementById('tb-sprint').textContent = `Sprint ${state.sprint}`;
+  document.getElementById('tb-phase').textContent = state.sprint_state.replace(/_/g,' ');
+  document.getElementById('tb-morale').textContent = state.team_morale + '%';
+  document.getElementById('tb-debt').textContent = state.global_tech_debt + '%';
+  const vel = state.velocity_trend;
+  document.getElementById('tb-velocity').textContent = vel.length ? vel[vel.length-1] + 'pts' : '—';
+  document.getElementById('tb-day').textContent = state.day;
+}
+
+// ════════════════════════════════════════════════════════════════
+// Chat
+// ════════════════════════════════════════════════════════════════
+function handleChatMessage(channel, message) {
+  if (!channelMessages[channel]) channelMessages[channel] = [];
+  channelMessages[channel].push(message);
+  if (channel !== currentChannel) {
+    unreadCounts[channel] = (unreadCounts[channel] || 0) + 1;
+  }
+  renderChannelList();
+  if (channel === currentChannel) {
+    appendMessage(message);
+    // Typing indicator clears
+    clearTyping();
+    showRandomTyping();
+  }
+}
+
+function renderChannelList() {
+  const list = document.getElementById('channel-list');
+  list.innerHTML = '';
+  CHANNELS_ORDER.forEach(ch => {
+    const div = document.createElement('div');
+    div.className = 'channel-item' + (ch === currentChannel ? ' active' : '');
+    div.innerHTML = `<span style="color:var(--text-dim)">#</span> ${ch}${unreadCounts[ch] > 0 && ch !== currentChannel ? `<span class="unread">${unreadCounts[ch]}</span>` : ''}`;
+    div.addEventListener('click', () => switchChannel(ch));
+    list.appendChild(div);
+  });
+}
+
+function switchChannel(ch) {
+  currentChannel = ch;
+  unreadCounts[ch] = 0;
+  document.getElementById('ch-name').textContent = ch;
+  document.getElementById('ch-desc').textContent = CHANNEL_DESCRIPTIONS[ch] || '';
+  renderChannelList();
+  renderMessages();
+}
+
+function renderMessages() {
+  const container = document.getElementById('messages');
+  container.innerHTML = '';
+  const msgs = channelMessages[currentChannel] || [];
+  msgs.slice(-80).forEach(m => appendMessage(m, false));
+  container.scrollTop = container.scrollHeight;
+}
+
+const ROLE_COLORS = {
+  'Product Owner': '#e8a838',
+  'Scrum Master': '#6264a7',
+  'Software Engineer': '#4ba3c3',
+  'Architect': '#c678dd',
+  'System': '#888',
+  'Stakeholder': '#e06c75',
+};
+
+function avatarColor(role) {
+  return ROLE_COLORS[role] || '#555';
+}
+
+function avatarInitials(name) {
+  return name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+}
+
+function timeStr(ts) {
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+function renderMsgText(text) {
+  // Minimal markdown: **bold**, *italic*, `code`
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code style="background:var(--bg3);padding:1px 4px;border-radius:3px;font-family:var(--mono);font-size:11px">$1</code>')
+    .replace(/_(.*?)_/g, '<em>$1</em>');
+}
+
+function appendMessage(m, scroll = true) {
+  const container = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg';
+  div.dataset.msgId = m.id;
+
+  const color = avatarColor(m.role);
+  const initials = avatarInitials(m.author);
+  const reactions = m.reactions || {};
+  const reactionHtml = Object.entries(reactions).map(([emoji, users]) =>
+    `<span class="reaction-pill" title="${users.join(', ')}">${emoji} <span>${users.length}</span></span>`
+  ).join('');
+
+  div.innerHTML = `
+    <div class="msg-avatar" style="background:${color}22;color:${color};border:1px solid ${color}44">${initials}</div>
+    <div class="msg-body">
+      <div class="msg-header">
+        <span class="msg-author" style="color:${color}">${m.author}</span>
+        <span class="msg-role">${m.role}</span>
+        <span class="msg-time">${timeStr(m.timestamp)}</span>
+      </div>
+      <div class="msg-text">${renderMsgText(m.text)}</div>
+      ${reactionHtml ? `<div class="msg-reactions">${reactionHtml}</div>` : ''}
+    </div>
+  `;
+
+  container.appendChild(div);
+  if (scroll) container.scrollTop = container.scrollHeight;
+}
+
+let typingTimeout = null;
+function showRandomTyping() {
+  if (!state || !state.agents) return;
+  if (Math.random() > 0.4) return;
+  const a = state.agents[Math.floor(Math.random() * state.agents.length)];
+  const indicator = document.getElementById('typing-indicator');
+  indicator.textContent = `${a.name} is typing...`;
+  typingTimeout = setTimeout(clearTyping, 2000 + Math.random() * 3000);
+}
+function clearTyping() {
+  if (typingTimeout) clearTimeout(typingTimeout);
+  document.getElementById('typing-indicator').textContent = '';
+}
+
+function renderParticipants() {
+  if (!state) return;
+  const list = document.getElementById('participant-list');
+  document.getElementById('online-count').textContent = state.agents.length;
+  list.innerHTML = state.agents.map(a => {
+    const morale = a.morale;
+    const statusClass = morale > 60 ? 'status-online' : morale > 35 ? 'status-away' : 'status-dnd';
+    const color = avatarColor(a.role);
+    return `<div class="participant">
+      <div class="status-dot ${statusClass}"></div>
+      <div>
+        <div class="participant-name" style="color:${color}">${a.name}</div>
+        <div class="participant-role">${a.role}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════════════
+// Scrum Board
+// ════════════════════════════════════════════════════════════════
+const KANBAN_COLS = [
+  { key: 'BACKLOG', label: 'Backlog', color: '#888' },
+  { key: 'READY', label: 'Ready', color: '#56b6c2' },
+  { key: 'SPRINT', label: 'Sprint Backlog', color: '#6264a7' },
+  { key: 'IN PROGRESS', label: 'In Progress', color: '#e8a838' },
+  { key: 'REVIEW', label: 'Review', color: '#c678dd' },
+  { key: 'DONE', label: 'Done', color: '#3dd68c' },
+];
+
+function renderScrum() {
+  if (!state) return;
+  renderKanban();
+  renderTeamPanel();
+  renderVelocityChart();
+}
+
+function renderKanban() {
+  const kanban = document.getElementById('kanban');
+  // Build column map
+  const colMap = {};
+  KANBAN_COLS.forEach(c => { colMap[c.key] = []; });
+  (state.backlog || []).forEach(s => {
+    const col = colMap[s.status] || colMap['BACKLOG'];
+    col.push(s);
+  });
+
+  // Only rebuild if column count changed (performance)
+  if (kanban.children.length !== KANBAN_COLS.length) {
+    kanban.innerHTML = '';
+    KANBAN_COLS.forEach(col => {
+      const div = document.createElement('div');
+      div.className = 'scrum-column';
+      div.dataset.col = col.key;
+      div.innerHTML = `
+        <div class="scrum-col-header" style="color:${col.color}">
+          ${col.label}
+          <span class="col-count" id="colcount-${col.key.replace(/ /g,'-')}">0</span>
+        </div>
+        <div class="scrum-cards" id="colcards-${col.key.replace(/ /g,'-')}"></div>
+      `;
+      kanban.appendChild(div);
+    });
+  }
+
+  KANBAN_COLS.forEach(col => {
+    const stories = colMap[col.key] || [];
+    const safeKey = col.key.replace(/ /g,'-');
+    const countEl = document.getElementById(`colcount-${safeKey}`);
+    const cardsEl = document.getElementById(`colcards-${safeKey}`);
+    if (countEl) countEl.textContent = stories.length;
+    if (cardsEl) {
+      cardsEl.innerHTML = stories.slice(0, 15).map(s => {
+        const confusion = s.confusion_level || 0;
+        const cColor = confusion > 0.7 ? '#e06c75' : confusion > 0.4 ? '#f4c262' : '#3dd68c';
+        const pts = s.team_estimate || s.complexity;
+        return `<div class="story-card">
+          <div class="card-id">${s.id}</div>
+          <div class="card-title">${s.title.slice(0,55)}</div>
+          <div class="card-meta">
+            <span class="card-pts">${pts}pt</span>
+            <span class="confusion-dot" style="background:${cColor}" title="Confusion: ${(confusion*100).toFixed(0)}%"></span>
+            <span class="card-assignee">${s.assigned_to || ''}</span>
+          </div>
+          ${s.blocker ? `<div class="card-blocker">⚠ ${s.blocker.slice(0,50)}</div>` : ''}
+        </div>`;
+      }).join('');
+    }
+  });
+}
+
+function renderTeamPanel() {
+  if (!state) return;
+  const list = document.getElementById('team-list');
+  list.innerHTML = (state.agents || []).map(a => {
+    const morale = a.morale;
+    const color = morale > 60 ? '#3dd68c' : morale > 35 ? '#f4c262' : '#e06c75';
+    const roleColor = avatarColor(a.role);
+    return `<div class="agent-row">
+      <div class="msg-avatar" style="width:26px;height:26px;font-size:10px;background:${roleColor}22;color:${roleColor};border:1px solid ${roleColor}44;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">${avatarInitials(a.name)}</div>
+      <div class="agent-info">
+        <div class="agent-name">${a.name}</div>
+        <div class="agent-role-label">${a.seniority} ${a.role}</div>
+        <div class="morale-bar"><div class="morale-fill" style="width:${morale}%;background:${color}"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const org = document.getElementById('org-metrics');
+  if (!org) return;
+  const metrics = [
+    { label: 'Team Morale', value: state.team_morale + '%', color: state.team_morale > 60 ? '#3dd68c' : '#f4c262' },
+    { label: 'Stakeholder Sat', value: state.stakeholder_satisfaction.toFixed(0) + '%', color: '#56b6c2' },
+    { label: 'Process Overhead', value: state.process_overhead + '%', color: state.process_overhead > 40 ? '#e06c75' : '#f4c262' },
+    { label: 'Global Tech Debt', value: state.global_tech_debt + '%', color: state.global_tech_debt > 50 ? '#e06c75' : '#f4c262' },
+    { label: 'Initiatives Done', value: state.completed_initiatives, color: '#3dd68c' },
+  ];
+  org.innerHTML = metrics.map(m =>
+    `<div class="org-metric"><span class="label">${m.label}</span><span class="value" style="color:${m.color}">${m.value}</span></div>`
+  ).join('');
+}
+
+function renderVelocityChart() {
+  const canvas = document.getElementById('vel-chart');
+  if (!canvas || !state) return;
+  const ctx = canvas.getContext('2d');
+  const data = state.velocity_trend || [];
+  if (!data.length) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const max = Math.max(...data, 1);
+  const w = canvas.width;
+  const h = canvas.height;
+  const pad = 4;
+  const barW = (w - pad * 2) / data.length - 2;
+
+  ctx.fillStyle = '#1b1b2f';
+  ctx.fillRect(0, 0, w, h);
+
+  data.forEach((v, i) => {
+    const x = pad + i * (barW + 2);
+    const barH = (v / max) * (h - pad * 2);
+    const y = h - pad - barH;
+    const ratio = v / max;
+    ctx.fillStyle = ratio > 0.7 ? '#3dd68c' : ratio > 0.4 ? '#f4c262' : '#e06c75';
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, barH, 2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = '#888';
+  ctx.font = '9px sans-serif';
+  ctx.fillText(`avg: ${(data.reduce((a,b)=>a+b,0)/data.length).toFixed(1)}`, pad, h - 2);
+}
+
+// ════════════════════════════════════════════════════════════════
+// Microservice Graph
+// ════════════════════════════════════════════════════════════════
+let graphInitialized = false;
+
+function initGraph() {
+  if (graphInitialized) {
+    updateGraph();
+    return;
+  }
+  graphInitialized = true;
+  cy = cytoscape({
+    container: document.getElementById('cy'),
+    style: [
+      {
+        selector: 'node',
+        style: {
+          'background-color': 'data(color)',
+          'label': 'data(label)',
+          'width': 'data(size)',
+          'height': 'data(size)',
+          'color': '#fff',
+          'font-size': 11,
+          'text-valign': 'bottom',
+          'text-halign': 'center',
+          'text-margin-y': 4,
+          'border-width': 2,
+          'border-color': 'data(borderColor)',
+          'border-opacity': 0.8,
+          'text-background-color': '#0a0a1a',
+          'text-background-opacity': 0.7,
+          'text-background-padding': '2px',
+        }
+      },
+      {
+        selector: 'node.legacy',
+        style: {
+          'border-style': 'dashed',
+          'opacity': 0.6,
+        }
+      },
+      {
+        selector: 'node:selected',
+        style: {
+          'border-width': 3,
+          'border-color': '#fff',
+        }
+      },
+      {
+        selector: 'edge',
+        style: {
+          'width': 'data(weight)',
+          'line-color': '#334',
+          'target-arrow-color': '#556',
+          'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier',
+          'opacity': 0.6,
+        }
+      },
+      {
+        selector: 'edge.incident',
+        style: {
+          'line-color': '#e06c75',
+          'target-arrow-color': '#e06c75',
+          'opacity': 1,
+          'width': 3,
+        }
+      }
+    ],
+    layout: { name: 'cose', padding: 60, animate: false },
+    wheelSensitivity: 0.3,
+  });
+
+  cy.on('tap', 'node', (evt) => {
+    selectedService = evt.target.data('id');
+    renderServiceDetail();
+  });
+
+  cy.on('tap', (evt) => {
+    if (evt.target === cy) {
+      selectedService = null;
+      renderServiceDetail();
+    }
+  });
+
+  updateGraph();
+}
+
+function serviceNodeColor(svc) {
+  const health = svc.health;
+  const debt = svc.tech_debt;
+  if (svc.is_legacy) return '#555577';
+  if (health < 0.3) return '#e06c75';
+  if (debt > 0.7) return '#c678dd';
+  if (health < 0.6) return '#f4c262';
+  return '#4ba3c3';
+}
+
+function serviceBorderColor(svc) {
+  if (svc.incident_count > 5) return '#e06c75';
+  if (svc.is_legacy) return '#888';
+  if (svc.tech_debt > 0.5) return '#c678dd';
+  return '#56b6c2';
+}
+
+function serviceSize(svc) {
+  // Base size on tech debt and activity
+  const base = 36;
+  return base + svc.tech_debt * 20;
+}
+
+function updateGraph() {
+  if (!cy || !state) return;
+  const services = state.services || {};
+  const deps = state.service_dependencies || [];
+
+  // Add/update nodes
+  Object.entries(services).forEach(([name, svc]) => {
+    const color = serviceNodeColor(svc);
+    const borderColor = serviceBorderColor(svc);
+    const size = serviceSize(svc);
+    const existing = cy.getElementById(name);
+    if (existing.length) {
+      existing.data({ color, borderColor, size, ...svc });
+      if (svc.is_legacy) existing.addClass('legacy');
+    } else {
+      cy.add({
+        group: 'nodes',
+        data: { id: name, label: name, color, borderColor, size, ...svc },
+        classes: svc.is_legacy ? 'legacy' : '',
+      });
+    }
+  });
+
+  // Add edges from dependencies
+  deps.forEach((d, i) => {
+    const edgeId = `e-${d.source}-${d.target}`;
+    if (!cy.getElementById(edgeId).length) {
+      if (cy.getElementById(d.source).length && cy.getElementById(d.target).length) {
+        cy.add({
+          group: 'edges',
+          data: { id: edgeId, source: d.source, target: d.target, weight: Math.max(1, d.weight * 3) }
+        });
+      }
+    }
+  });
+
+  // Layout if first time or new nodes
+  if (cy.nodes().length > 0 && cy.nodes().length !== Object.keys(services).length) {
+    cy.layout({ name: 'cose', padding: 60, animate: true, animationDuration: 800 }).run();
+  } else if (cy.nodes().length === 0) {
+    cy.layout({ name: 'cose', padding: 60, animate: false }).run();
+  }
+
+  if (selectedService) renderServiceDetail();
+}
+
+function renderServiceDetail() {
+  const panel = document.getElementById('service-detail');
+  if (!selectedService || !state) {
+    panel.innerHTML = '<div style="color:var(--text-dim);font-size:12px">Click a service node to inspect it.</div>';
+    return;
+  }
+  const svc = state.services[selectedService];
+  if (!svc) return;
+
+  const healthColor = svc.health > 0.7 ? '#3dd68c' : svc.health > 0.4 ? '#f4c262' : '#e06c75';
+  const debtColor = svc.tech_debt > 0.7 ? '#e06c75' : svc.tech_debt > 0.4 ? '#f4c262' : '#3dd68c';
+
+  panel.innerHTML = `
+    <div class="sd-name">${svc.name}</div>
+    <div class="sd-row"><span class="sd-label">Status</span><span class="sd-val" style="color:${svc.is_legacy?'#888':'#3dd68c'}">${svc.is_legacy ? 'LEGACY' : 'ACTIVE'}</span></div>
+    <div style="margin:8px 0">
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:3px">Health</div>
+      <div class="health-bar-large"><div class="health-bar-fill" style="width:${svc.health*100}%;background:${healthColor}"></div></div>
+      <div style="font-size:11px;color:${healthColor}">${(svc.health*100).toFixed(0)}%</div>
+    </div>
+    <div style="margin:8px 0">
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:3px">Technical Debt</div>
+      <div class="health-bar-large"><div class="health-bar-fill" style="width:${svc.tech_debt*100}%;background:${debtColor}"></div></div>
+      <div style="font-size:11px;color:${debtColor}">${(svc.tech_debt*100).toFixed(0)}%</div>
+    </div>
+    <div class="sd-row"><span class="sd-label">Incidents</span><span class="sd-val" style="color:${svc.incident_count>3?'#e06c75':'#888'}">${svc.incident_count}</span></div>
+    ${svc.owners && svc.owners.length ? `<div class="sd-row"><span class="sd-label">Owners</span><span class="sd-val" style="font-size:11px">${svc.owners.join(', ')}</span></div>` : ''}
+    <div class="incident-log">
+      <div class="il-title">⚠ ${svc.incident_count} total incidents</div>
+      ${svc.is_legacy ? '<div style="color:#c678dd;margin-top:4px">This service has become legacy. Proceed with caution.</div>' : ''}
+      ${svc.tech_debt > 0.7 ? '<div style="color:#e06c75;margin-top:4px">Critical tech debt. Stability at risk.</div>' : ''}
+    </div>
+  `;
+}
+
+// ════════════════════════════════════════════════════════════════
+// Init
+// ════════════════════════════════════════════════════════════════
+renderChannelList();
+switchChannel('general');
+</script>
+</body>
+</html>
