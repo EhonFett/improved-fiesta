@@ -1226,6 +1226,7 @@ function updateGraph() {
   if (!cy || !state) return;
   const services = state.services || {};
   const deps = state.service_dependencies || [];
+  const prevCount = cy.nodes().length;
 
   // Add/update nodes
   Object.entries(services).forEach(([name, svc]) => {
@@ -1237,16 +1238,19 @@ function updateGraph() {
       existing.data({ color, borderColor, size, ...svc });
       if (svc.is_legacy) existing.addClass('legacy');
     } else {
+      // Spread new nodes around the existing graph centre so layout starts clean
+      const spread = Math.max(200, prevCount * 40);
       cy.add({
         group: 'nodes',
         data: { id: name, label: name, color, borderColor, size, ...svc },
         classes: svc.is_legacy ? 'legacy' : '',
+        position: { x: (Math.random() - 0.5) * spread, y: (Math.random() - 0.5) * spread },
       });
     }
   });
 
   // Add edges from dependencies
-  deps.forEach((d, i) => {
+  deps.forEach((d) => {
     const edgeId = `e-${d.source}-${d.target}`;
     if (!cy.getElementById(edgeId).length) {
       if (cy.getElementById(d.source).length && cy.getElementById(d.target).length) {
@@ -1258,11 +1262,11 @@ function updateGraph() {
     }
   });
 
-  // Layout if first time or new nodes
-  if (cy.nodes().length > 0 && cy.nodes().length !== Object.keys(services).length) {
-    cy.layout({ name: 'cose', padding: 60, animate: true, animationDuration: 800 }).run();
-  } else if (cy.nodes().length === 0) {
-    cy.layout({ name: 'cose', padding: 60, animate: false }).run();
+  // Run layout whenever the node count changes (covers initial load and new services)
+  const newCount = cy.nodes().length;
+  if (newCount !== prevCount) {
+    const animate = prevCount > 0; // no animation on first paint
+    cy.layout({ name: 'cose', padding: 60, animate, animationDuration: 800 }).run();
   }
 
   if (selectedService) renderServiceDetail();
